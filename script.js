@@ -51,7 +51,6 @@
   // --- Teams Calendar Background + Events as Bricks ---
   const dayNamesShort = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const eventTitles = ['Standup','Sprint Sync','1:1','Design Review','All Hands','Demo','Retro','Planning','Customer Call','Interview','Deep Work','Doc Review','Bug Triage'];
-  const eventColors = ['#4F6BED', '#464EB8', '#8B88F3', '#43B581', '#C67BF4', '#DC5E5E', '#E5A50A'];
   const roomNames = ['Conf Room A','Conf Room B','Huddle 2','Room 12F','Boardroom','Zoom Room','Townhall'];
   const peopleFirst = ['Alex','Sam','Taylor','Jordan','Casey','Riley','Avery','Cameron','Drew','Harper','Jamie','Logan','Morgan','Parker','Quinn','Elliot','Rowan','Finley','Sasha','Hayden'];
   const peopleLast = ['Lee','Patel','Garcia','Nguyen','Kim','Smith','Brown','Khan','Singh','Wong','Lopez','Martinez','Davis','Miller','Wilson','Moore','Clark','Young','King','Hall'];
@@ -73,7 +72,7 @@
     const timeGutterW = 64;
     const days = 7; // Keep 7-day grid; we will not generate events on Sat/Sun
     const startHour = 0; // 12 AM
-    const endHour = 12; // 12 PM
+    const endHour = 24; // 12 AM next day
     const hours = endHour - startHour;
 
     const calX = marginX;
@@ -102,7 +101,7 @@
     for (let i = 1; i <= 5; i++) {
       const eventsPerDay = 7 + ((i * 3) % 4); // 7-10 events per day for "lots of meetings"
       for (let e = 0; e < eventsPerDay; e++) {
-        const startHour = ((i * 37 + e * 17) % 12); // between 0 and 11 (12am–12pm)
+        const startHour = ((i * 37 + e * 17) % 24); // between 0 and 23 (12am–12am)
         const startMin = [0, 15, 30, 45][(i * 11 + e * 7) % 4];
         const durationMin = 30 + 15 * ((i + e) % 6); // 30-105
         const title = eventTitles[(i * 5 + e * 3) % eventTitles.length];
@@ -112,7 +111,7 @@
         const date = new Date(start);
         date.setDate(start.getDate() + i);
         date.setHours(startHour, startMin, 0, 0);
-        // Default color grey
+        // Default color grey; 60% recolored to #b22222 below
         const color = '#dcdcdc';
         calendarEvents.push({ dayIndex: i, start: date, durationMin, title, color, location, attendees, alive: true });
       }
