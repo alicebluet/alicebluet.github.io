@@ -5,6 +5,7 @@ body {
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   background: #0f172a; /* slate-900 */
   color: #e2e8f0;
+  overflow: hidden; /* prevent scrolling */
 }
 
 /* Background that looks like a mosaic of meeting tiles */
@@ -35,18 +36,16 @@ body::after {
 
 #game {
   display: block;
-  width: min(96vw, 1100px);
-  height: auto;
-  aspect-ratio: 16 / 9;
-  margin: 2.5vh auto;
-  border-radius: 16px;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  border-radius: 0;
   background: linear-gradient(180deg, rgba(15,23,42,0.85), rgba(2,6,23,0.85));
-  box-shadow:
-    0 30px 80px rgba(0,0,0,0.6),
-    0 8px 20px rgba(0,0,0,0.3),
-    0 0 0 1px rgba(255,255,255,0.06) inset;
+  box-shadow: none;
 }
 
 @media (max-width: 640px) {
-  #game { width: 98vw; border-radius: 12px; }
+  #game { width: 100vw; height: 100vh; }
 } 

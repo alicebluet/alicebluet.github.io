@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Team Meeting Breakout</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,6 +11,22 @@
   </head>
   <body>
     <canvas id="game" aria-label="Team Meeting Breakout" role="img"></canvas>
+    <script>
+      // Match canvas backing store to CSS size for crisp rendering at full screen
+      (function() {
+        const canvas = document.getElementById('game');
+        const dpr = Math.max(window.devicePixelRatio || 1, 1);
+        function resize() {
+          const rect = canvas.getBoundingClientRect();
+          canvas.width = Math.floor(rect.width * dpr);
+          canvas.height = Math.floor(rect.height * dpr);
+          // The game script sets its own logical size; we use CSS scaling for visuals.
+        }
+        window.addEventListener('resize', resize);
+        window.addEventListener('orientationchange', resize);
+        resize();
+      })();
+    </script>
     <script src="script.js" defer></script>
   </body>
 </html> 
