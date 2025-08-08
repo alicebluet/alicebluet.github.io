@@ -362,6 +362,38 @@
     }
   }
 
+  // Draw red "now" line across the calendar (on top of events)
+  function drawNowIndicator() {
+    const layout = getCalendarLayout();
+    const weekStart = getStartOfWeek(new Date());
+    const now = new Date();
+
+    // Only draw if current time is within the displayed hours
+    const minutesFromStart = (now.getHours() - layout.startHour) * 60 + now.getMinutes();
+    const totalMin = layout.hours * 60;
+    if (minutesFromStart < 0 || minutesFromStart > totalMin) return;
+
+    const y = Math.round(layout.gridY + (minutesFromStart / totalMin) * layout.gridH) + 0.5;
+
+    // Line across all day columns
+    ctx.strokeStyle = '#b22222';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(layout.calX + layout.timeGutterW, y);
+    ctx.lineTo(layout.calX + layout.calW, y);
+    ctx.stroke();
+
+    // Small dot at the current day column edge
+    const dayIndex = Math.floor((now - weekStart) / (24 * 60 * 60 * 1000));
+    if (dayIndex >= 0 && dayIndex < layout.days) {
+      const dayX = layout.calX + layout.timeGutterW + dayIndex * layout.columnW;
+      ctx.fillStyle = '#b22222';
+      ctx.beginPath();
+      ctx.arc(dayX + 4, y, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   // Drawing helpers
   function drawBackground() {
     drawTeamsCalendarBackground();
@@ -475,6 +507,8 @@
   function render() {
     drawBackground();
     drawBricks();
+    // Draw current time indicator on top of events
+    drawNowIndicator();
     drawPaddle();
     drawBall();
     drawHUD();
