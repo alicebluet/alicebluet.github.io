@@ -9,6 +9,9 @@
   canvas.width = LOGICAL_WIDTH;
   canvas.height = LOGICAL_HEIGHT;
 
+  // Visual/layout safety
+  const SAFE_BOTTOM_GAP = 100; // space reserved above paddle for meetings to stop
+
   // Colors & theme
   const colors = {
     bgTop: '#0f172a',
@@ -49,6 +52,9 @@
   const dayNamesShort = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const eventTitles = ['Standup','Sprint Sync','1:1','Design Review','All Hands','Demo','Retro','Planning','Customer Call','Interview','Deep Work','Doc Review','Bug Triage'];
   const eventColors = ['#4F6BED', '#464EB8', '#8B88F3', '#43B581', '#C67BF4', '#DC5E5E', '#E5A50A'];
+  const roomNames = ['Conf Room A','Conf Room B','Huddle 2','Room 12F','Boardroom','Zoom Room','Townhall'];
+  const peopleFirst = ['Alex','Sam','Taylor','Jordan','Casey','Riley','Avery','Cameron','Drew','Harper','Jamie','Logan','Morgan','Parker','Quinn','Elliot','Rowan','Finley','Sasha','Hayden'];
+  const peopleLast = ['Lee','Patel','Garcia','Nguyen','Kim','Smith','Brown','Khan','Singh','Wong','Lopez','Martinez','Davis','Miller','Wilson','Moore','Clark','Young','King','Hall'];
   let calendarEvents = [];
 
   function getStartOfWeek(date) {
@@ -73,13 +79,20 @@
     const calX = marginX;
     const calY = marginY + 28;
     const calW = LOGICAL_WIDTH - marginX * 2;
-    const calH = LOGICAL_HEIGHT - calY - 32;
+    // Reserve bottom gap so meetings visually stop above paddle
+    const calH = Math.max(160, LOGICAL_HEIGHT - calY - 32 - SAFE_BOTTOM_GAP);
 
     const columnW = (calW - timeGutterW) / days;
     const gridY = calY + headerH;
     const gridH = calH - headerH;
 
     return { marginX, marginY, headerH, timeGutterW, days, startHour, endHour, hours, calX, calY, calW, calH, columnW, gridY, gridH };
+  }
+
+  function randomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+  function randomChoice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function randomPerson() {
+    return `${randomChoice(peopleFirst)} ${randomChoice(peopleLast)}`;
   }
 
   function buildCalendarEvents() {
@@ -94,26 +107,34 @@
         const durationMin = 30 + 15 * ((i + e) % 6); // 30-105
         const title = eventTitles[(i * 5 + e * 3) % eventTitles.length];
         const color = eventColors[(i + e) % eventColors.length];
+        const location = randomChoice(roomNames);
+        const attendeeCount = randomInt(1, 5);
+        const attendees = Array.from({ length: attendeeCount }, () => randomPerson());
         const date = new Date(start);
         date.setDate(start.getDate() + i);
         date.setHours(startHour, startMin, 0, 0);
-        calendarEvents.push({ dayIndex: i, start: date, durationMin, title, color, alive: true });
+        calendarEvents.push({ dayIndex: i, start: date, durationMin, title, color, location, attendees, alive: true });
       }
     }
   }
 
   function layoutCalendarEvents(layout) {
-    const { dayIndexProperty = 'dayIndex' } = {};
     const totalMin = layout.hours * 60;
     for (const ev of calendarEvents) {
       const dayX = layout.calX + layout.timeGutterW + ev.dayIndex * layout.columnW + 4;
       const evW = layout.columnW - 8;
       const minutesFromStart = (ev.start.getHours() - layout.startHour) * 60 + ev.start.getMinutes();
       const yStart = layout.gridY + (minutesFromStart / totalMin) * layout.gridH + 2;
-      const yH = Math.max(18, (ev.durationMin / totalMin) * layout.gridH - 4);
+      let yH = Math.max(18, (ev.durationMin / totalMin) * layout.gridH - 4);
 
       // Simple jitter to reduce visual overlap
       const jitter = ((ev.start.getMinutes() / 15) % 2) * 6;
+
+      // Ensure we keep a gap above the paddle
+      const maxBottom = paddle.y - 24; // 24px breathing room
+      if (yStart + yH > maxBottom) {
+        yH = Math.max(14, maxBottom - yStart);
+      }
 
       ev.x = dayX + jitter;
       ev.y = yStart;
@@ -365,10 +386,10 @@
   }
 
   function drawBricks() {
-    // Draw alive calendar events as bricks
+    // Draw alive calendar events as bricks with richer content
     for (const ev of calendarEvents) {
       if (!ev.alive) continue;
-      ctx.fillStyle = hexToRgba(ev.color, 0.85);
+      ctx.fillStyle = hexToRgba(ev.color, 0.88);
       roundRect(ctx, ev.x, ev.y, ev.width, ev.height, 8);
       ctx.fill();
       ctx.strokeStyle = hexToRgba('#000000', 0.25);
@@ -378,11 +399,52 @@
       ctx.beginPath();
       roundRect(ctx, ev.x, ev.y, ev.width, ev.height, 8);
       ctx.clip();
-      ctx.fillStyle = 'white';
-      ctx.font = '600 12px Inter, system-ui';
-      ctx.fillText(ev.title, ev.x + 8, ev.y + 16);
+
+      let textY = ev.y + 16;
+      const textLeft = ev.x + 8;
+      const textRight = ev.x + ev.width - 8;
+      const maxY = ev.y + ev.height - 6;
+
+      // Title (bold)
+      ctx.fillStyle = 'rgba(255,255,255,0.98)';
+      ctx.font = '700 12px Inter, system-ui';
+      if (textY <= maxY) {
+        drawSingleLine(ctx, ev.title, textLeft, textRight, textY);
+        textY += 16;
+      }
+
+      // Location (regular)
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.font = '12px Inter, system-ui';
+      if (textY <= maxY) {
+        drawSingleLine(ctx, ev.location, textLeft, textRight, textY);
+        textY += 14;
+      }
+
+      // Attendees (regular, comma-separated)
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.font = '12px Inter, system-ui';
+      const attendeesText = ev.attendees.join(', ');
+      if (textY <= maxY) {
+        drawSingleLine(ctx, attendeesText, textLeft, textRight, textY);
+        textY += 14;
+      }
+
       ctx.restore();
     }
+  }
+
+  function drawSingleLine(ctx, text, xLeft, xRight, y) {
+    const maxWidth = xRight - xLeft;
+    // Simple truncation with ellipsis if too long
+    let t = text;
+    while (ctx.measureText(t).width > maxWidth && t.length > 1) {
+      t = t.slice(0, -2);
+    }
+    if (t !== text) {
+      if (t.length > 1) t = t.slice(0, -1) + '…';
+    }
+    ctx.fillText(t, xLeft, y);
   }
 
   function drawHUD() {
