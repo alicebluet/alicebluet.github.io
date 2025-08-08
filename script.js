@@ -45,42 +45,152 @@
     onPaddle: true,
   };
 
-  // Meeting grid (bricks)
-  const meetingRows = 5;
-  const meetingCols = 10;
-  const meetingPadding = 14;
-  const meetingTopOffset = 100;
-  const meetingLeftOffset = 60;
-  const meetingWidth = Math.floor((LOGICAL_WIDTH - meetingLeftOffset * 2 - meetingPadding * (meetingCols - 1)) / meetingCols);
-  const meetingHeight = 60;
+  // --- Teams Calendar Background + Events as Bricks ---
+  const dayNamesShort = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const eventTitles = ['Standup','Sprint Sync','1:1','Design Review','All Hands','Demo','Retro','Planning','Customer Call','Interview','Deep Work','Doc Review','Bug Triage'];
+  const eventColors = ['#4F6BED', '#464EB8', '#8B88F3', '#43B581', '#C67BF4', '#DC5E5E', '#E5A50A'];
+  let calendarEvents = [];
 
-  let bricks = [];
-  function buildBricks() {
-    bricks = [];
-    for (let r = 0; r < meetingRows; r++) {
-      for (let c = 0; c < meetingCols; c++) {
-        const x = meetingLeftOffset + c * (meetingWidth + meetingPadding);
-        const y = meetingTopOffset + r * (meetingHeight + meetingPadding);
-        const hue = 210 + Math.floor((r * 12 + c * 6) % 40);
-        bricks.push({
-          x,
-          y,
-          width: meetingWidth,
-          height: meetingHeight,
-          alive: true,
-          color: `hsl(${hue} 40% 20%)`,
-          name: mockName(r, c),
-        });
+  function getStartOfWeek(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day; // Sunday as first day
+    const start = new Date(d.setDate(diff));
+    start.setHours(0,0,0,0);
+    return start;
+  }
+
+  function getCalendarLayout() {
+    const marginX = 24;
+    const marginY = 24;
+    const headerH = 56;
+    const timeGutterW = 64;
+    const days = 7;
+    const startHour = 7;
+    const endHour = 19; // 7 PM
+    const hours = endHour - startHour;
+
+    const calX = marginX;
+    const calY = marginY + 28;
+    const calW = LOGICAL_WIDTH - marginX * 2;
+    const calH = LOGICAL_HEIGHT - calY - 32;
+
+    const columnW = (calW - timeGutterW) / days;
+    const gridY = calY + headerH;
+    const gridH = calH - headerH;
+
+    return { marginX, marginY, headerH, timeGutterW, days, startHour, endHour, hours, calX, calY, calW, calH, columnW, gridY, gridH };
+  }
+
+  function buildCalendarEvents() {
+    calendarEvents = [];
+    const start = getStartOfWeek(new Date());
+    const days = 7;
+    for (let i = 0; i < days; i++) {
+      const eventsPerDay = 7 + ((i * 3) % 4); // 7-10 events per day for "lots of meetings"
+      for (let e = 0; e < eventsPerDay; e++) {
+        const startHour = 7 + ((i * 37 + e * 17) % 12); // between 7 and 18
+        const startMin = [0, 15, 30, 45][(i * 11 + e * 7) % 4];
+        const durationMin = 30 + 15 * ((i + e) % 6); // 30-105
+        const title = eventTitles[(i * 5 + e * 3) % eventTitles.length];
+        const color = eventColors[(i + e) % eventColors.length];
+        const date = new Date(start);
+        date.setDate(start.getDate() + i);
+        date.setHours(startHour, startMin, 0, 0);
+        calendarEvents.push({ dayIndex: i, start: date, durationMin, title, color, alive: true });
       }
     }
   }
 
-  const mockFirst = ['Alex','Sam','Taylor','Jordan','Casey','Riley','Avery','Cameron','Drew','Harper','Jamie','Logan','Morgan','Parker','Quinn'];
-  const mockLast = ['Lee','Patel','Garcia','Nguyen','Kim','Smith','Brown','Khan','Singh','Wong','Lopez','Martinez','Davis','Miller','Wilson'];
-  function mockName(r, c) {
-    const f = mockFirst[(r * 3 + c * 5) % mockFirst.length];
-    const l = mockLast[(r * 7 + c * 11) % mockLast.length];
-    return `${f} ${l}`;
+  function layoutCalendarEvents(layout) {
+    const { dayIndexProperty = 'dayIndex' } = {};
+    const totalMin = layout.hours * 60;
+    for (const ev of calendarEvents) {
+      const dayX = layout.calX + layout.timeGutterW + ev.dayIndex * layout.columnW + 4;
+      const evW = layout.columnW - 8;
+      const minutesFromStart = (ev.start.getHours() - layout.startHour) * 60 + ev.start.getMinutes();
+      const yStart = layout.gridY + (minutesFromStart / totalMin) * layout.gridH + 2;
+      const yH = Math.max(18, (ev.durationMin / totalMin) * layout.gridH - 4);
+
+      // Simple jitter to reduce visual overlap
+      const jitter = ((ev.start.getMinutes() / 15) % 2) * 6;
+
+      ev.x = dayX + jitter;
+      ev.y = yStart;
+      ev.width = evW - jitter;
+      ev.height = yH;
+      if (typeof ev.alive !== 'boolean') ev.alive = true;
+    }
+  }
+
+  function drawTeamsCalendarBackground() {
+    const layout = getCalendarLayout();
+
+    // Base gradient
+    const g = ctx.createLinearGradient(0, 0, 0, LOGICAL_HEIGHT);
+    g.addColorStop(0, colors.bgTop);
+    g.addColorStop(1, colors.bgBottom);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+
+    // Header background
+    ctx.fillStyle = colors.calHeaderBg;
+    roundRect(ctx, layout.calX, layout.calY, layout.calW, layout.headerH, 10);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.stroke();
+
+    // Header day labels
+    const start = getStartOfWeek(new Date());
+    ctx.fillStyle = colors.calHeaderText;
+    ctx.font = '600 16px Inter, system-ui';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < layout.days; i++) {
+      const dayX = layout.calX + layout.timeGutterW + i * layout.columnW;
+      const thisDay = new Date(start);
+      thisDay.setDate(start.getDate() + i);
+      const label = `${dayNamesShort[thisDay.getDay()]} ${thisDay.getMonth()+1}/${thisDay.getDate()}`;
+      ctx.fillText(label, dayX + 12, layout.calY + layout.headerH / 2);
+    }
+
+    // Vertical lines (day separators)
+    ctx.strokeStyle = colors.calGridBold;
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= layout.days; i++) {
+      const x = Math.round(layout.calX + layout.timeGutterW + i * layout.columnW) + 0.5;
+      ctx.beginPath();
+      ctx.moveTo(x, layout.gridY);
+      ctx.lineTo(x, layout.gridY + layout.gridH);
+      ctx.stroke();
+    }
+
+    // Horizontal lines (each hour) + time labels
+    ctx.strokeStyle = colors.calGrid;
+    ctx.fillStyle = colors.calTimeText;
+    ctx.font = '12px Inter, system-ui';
+    for (let h = 0; h <= layout.hours; h++) {
+      const y = Math.round(layout.gridY + (h / layout.hours) * layout.gridH) + 0.5;
+      ctx.beginPath();
+      ctx.moveTo(layout.calX + layout.timeGutterW, y);
+      ctx.lineTo(layout.calX + layout.calW, y);
+      ctx.stroke();
+
+      if (h < layout.hours) {
+        const hour24 = layout.startHour + h;
+        const ampm = hour24 >= 12 ? 'PM' : 'AM';
+        const hour12 = ((hour24 + 11) % 12) + 1;
+        ctx.fillText(`${hour12} ${ampm}`, layout.calX + 8, y + 2);
+      }
+    }
+  }
+
+  function hexToRgba(hex, alpha) {
+    const m = hex.replace('#','');
+    const bigint = parseInt(m.length === 3 ? m.split('').map(c=>c+c).join('') : m, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
   function resetBall() {
@@ -94,8 +204,8 @@
   function resetGame() {
     paddle.x = LOGICAL_WIDTH / 2 - paddle.width / 2;
     paddle.targetX = paddle.x;
-    buildBricks();
-    if (calendarEvents.length === 0) buildCalendarEvents();
+    buildCalendarEvents();
+    layoutCalendarEvents(getCalendarLayout());
     resetBall();
   }
 
@@ -172,21 +282,20 @@
         resetBall();
       }
 
-      // Brick collisions
-      for (const brick of bricks) {
-        if (!brick.alive) continue;
-        const collided = circleRectCollision(ball.x, ball.y, ball.radius, brick.x, brick.y, brick.width, brick.height);
+      // Event (brick) collisions
+      for (const ev of calendarEvents) {
+        if (!ev.alive) continue;
+        const collided = circleRectCollision(ball.x, ball.y, ball.radius, ev.x, ev.y, ev.width, ev.height);
         if (collided) {
-          brick.alive = false;
-          resolveBallBounceOffRect(brick);
+          ev.alive = false;
+          resolveBallBounceOffRect({ x: ev.x, y: ev.y, width: ev.width, height: ev.height });
           break;
         }
       }
 
-      // Win condition
-      if (bricks.every(b => !b.alive)) {
-        buildBricks();
-        resetBall();
+      // Win condition: all meetings cleared
+      if (calendarEvents.length > 0 && calendarEvents.every(e => !e.alive)) {
+        resetGame();
       }
     }
   }
@@ -227,154 +336,6 @@
     }
   }
 
-  // --- Teams Calendar Background ---
-  const dayNamesShort = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const eventTitles = ['Standup','Sprint Sync','1:1','Design Review','All Hands','Demo','Retro','Planning','Customer Call','Interview'];
-  const eventColors = ['#4F6BED', '#464EB8', '#8B88F3', '#43B581', '#C67BF4', '#DC5E5E'];
-  let calendarEvents = [];
-
-  function getStartOfWeek(date) {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day; // Sunday as first day
-    const start = new Date(d.setDate(diff));
-    start.setHours(0,0,0,0);
-    return start;
-  }
-
-  function buildCalendarEvents() {
-    calendarEvents = [];
-    const start = getStartOfWeek(new Date());
-    const days = 7;
-    for (let i = 0; i < days; i++) {
-      const eventsPerDay = 2 + (i % 3); // 2-4 events
-      for (let e = 0; e < eventsPerDay; e++) {
-        const startHour = 8 + ((i * 37 + e * 17) % 9); // between 8 and 16
-        const startMin = [0, 15, 30, 45][(i * 11 + e * 7) % 4];
-        const durationMin = 30 + 15 * ((i + e) % 5); // 30-90
-        const title = eventTitles[(i * 5 + e * 3) % eventTitles.length];
-        const color = eventColors[(i + e) % eventColors.length];
-        const date = new Date(start);
-        date.setDate(start.getDate() + i);
-        date.setHours(startHour, startMin, 0, 0);
-        calendarEvents.push({ dayIndex: i, start: date, durationMin, title, color });
-      }
-    }
-  }
-
-  function drawTeamsCalendarBackground() {
-    // Base gradient
-    const g = ctx.createLinearGradient(0, 0, 0, LOGICAL_HEIGHT);
-    g.addColorStop(0, colors.bgTop);
-    g.addColorStop(1, colors.bgBottom);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
-
-    // Calendar layout
-    const marginX = 24;
-    const marginY = 24;
-    const headerH = 56;
-    const timeGutterW = 64;
-    const days = 7;
-    const startHour = 8;
-    const endHour = 19; // 7 PM
-    const hours = endHour - startHour;
-
-    const calX = marginX;
-    const calY = marginY + 28;
-    const calW = LOGICAL_WIDTH - marginX * 2;
-    const calH = LOGICAL_HEIGHT - calY - 32;
-
-    // Header background
-    ctx.fillStyle = colors.calHeaderBg;
-    roundRect(ctx, calX, calY, calW, headerH, 10);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-    ctx.stroke();
-
-    // Header day labels
-    const columnW = (calW - timeGutterW) / days;
-    const start = getStartOfWeek(new Date());
-    ctx.fillStyle = colors.calHeaderText;
-    ctx.font = '600 16px Inter, system-ui';
-    ctx.textBaseline = 'middle';
-    for (let i = 0; i < days; i++) {
-      const dayX = calX + timeGutterW + i * columnW;
-      const thisDay = new Date(start);
-      thisDay.setDate(start.getDate() + i);
-      const label = `${dayNamesShort[thisDay.getDay()]} ${thisDay.getMonth()+1}/${thisDay.getDate()}`;
-      ctx.fillText(label, dayX + 12, calY + headerH / 2);
-    }
-
-    // Grid body
-    const gridY = calY + headerH;
-    const gridH = calH - headerH;
-
-    // Vertical lines (day separators)
-    ctx.strokeStyle = colors.calGridBold;
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= days; i++) {
-      const x = Math.round(calX + timeGutterW + i * columnW) + 0.5;
-      ctx.beginPath();
-      ctx.moveTo(x, gridY);
-      ctx.lineTo(x, gridY + gridH);
-      ctx.stroke();
-    }
-
-    // Horizontal lines (each hour) + time labels
-    ctx.strokeStyle = colors.calGrid;
-    ctx.fillStyle = colors.calTimeText;
-    ctx.font = '12px Inter, system-ui';
-    for (let h = 0; h <= hours; h++) {
-      const y = Math.round(gridY + (h / hours) * gridH) + 0.5;
-      ctx.beginPath();
-      ctx.moveTo(calX + timeGutterW, y);
-      ctx.lineTo(calX + calW, y);
-      ctx.stroke();
-
-      if (h < hours) {
-        const hour24 = startHour + h;
-        const ampm = hour24 >= 12 ? 'PM' : 'AM';
-        const hour12 = ((hour24 + 11) % 12) + 1;
-        ctx.fillText(`${hour12} ${ampm}`, calX + 8, y + 2);
-      }
-    }
-
-    // Events
-    for (const ev of calendarEvents) {
-      const dayX = calX + timeGutterW + ev.dayIndex * columnW + 4;
-      const evW = columnW - 8;
-      const totalMin = hours * 60;
-      const minutesFromStart = (ev.start.getHours() - startHour) * 60 + ev.start.getMinutes();
-      const yStart = gridY + (minutesFromStart / totalMin) * gridH + 2;
-      const yH = Math.max(18, (ev.durationMin / totalMin) * gridH - 4);
-
-      ctx.fillStyle = hexToRgba(ev.color, 0.8);
-      roundRect(ctx, dayX, yStart, evW, yH, 8);
-      ctx.fill();
-      ctx.strokeStyle = hexToRgba('#000000', 0.25);
-      ctx.stroke();
-
-      ctx.save();
-      ctx.beginPath();
-      roundRect(ctx, dayX, yStart, evW, yH, 8);
-      ctx.clip();
-      ctx.fillStyle = 'white';
-      ctx.font = '600 12px Inter, system-ui';
-      ctx.fillText(ev.title, dayX + 8, yStart + 16);
-      ctx.restore();
-    }
-  }
-
-  function hexToRgba(hex, alpha) {
-    const m = hex.replace('#','');
-    const bigint = parseInt(m.length === 3 ? m.split('').map(c=>c+c).join('') : m, 16);
-    const r = (bigint >> 16) & 255;
-    const g = (bigint >> 8) & 255;
-    const b = bigint & 255;
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-
   // Drawing helpers
   function drawBackground() {
     drawTeamsCalendarBackground();
@@ -404,26 +365,23 @@
   }
 
   function drawBricks() {
-    for (const b of bricks) {
-      if (!b.alive) continue;
-      ctx.fillStyle = b.color;
-      roundRect(ctx, b.x, b.y, b.width, b.height, 10);
+    // Draw alive calendar events as bricks
+    for (const ev of calendarEvents) {
+      if (!ev.alive) continue;
+      ctx.fillStyle = hexToRgba(ev.color, 0.85);
+      roundRect(ctx, ev.x, ev.y, ev.width, ev.height, 8);
       ctx.fill();
-      ctx.strokeStyle = colors.brickBorder;
+      ctx.strokeStyle = hexToRgba('#000000', 0.25);
       ctx.stroke();
 
-      const cx = b.x + 18, cy = b.y + 18, ar = 12;
-      ctx.fillStyle = 'hsl(190 80% 60% / 0.9)';
-      ctx.beginPath(); ctx.arc(cx, cy, ar, 0, Math.PI * 2); ctx.fill();
-
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.font = '14px Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(b.name, b.x + 40, b.y + 18);
-
-      ctx.fillStyle = 'rgba(0,0,0,0.15)';
-      roundRect(ctx, b.x + 10, b.y + 36, b.width - 20, b.height - 46, 8);
-      ctx.fill();
+      ctx.save();
+      ctx.beginPath();
+      roundRect(ctx, ev.x, ev.y, ev.width, ev.height, 8);
+      ctx.clip();
+      ctx.fillStyle = 'white';
+      ctx.font = '600 12px Inter, system-ui';
+      ctx.fillText(ev.title, ev.x + 8, ev.y + 16);
+      ctx.restore();
     }
   }
 
@@ -462,7 +420,6 @@
   }
 
   // Initialize
-  buildCalendarEvents();
   resetGame();
   loop();
 })(); 
