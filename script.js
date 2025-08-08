@@ -71,7 +71,7 @@
     const marginY = 24;
     const headerH = 56;
     const timeGutterW = 64;
-    const days = 7;
+    const days = 7; // Keep 7-day grid; we will not generate events on Sat/Sun
     const startHour = 7;
     const endHour = 19; // 7 PM
     const hours = endHour - startHour;
@@ -98,23 +98,28 @@
   function buildCalendarEvents() {
     calendarEvents = [];
     const start = getStartOfWeek(new Date());
-    const days = 7;
-    for (let i = 0; i < days; i++) {
+    // Only generate for Mon-Fri (dayIndex 1..5)
+    for (let i = 1; i <= 5; i++) {
       const eventsPerDay = 7 + ((i * 3) % 4); // 7-10 events per day for "lots of meetings"
       for (let e = 0; e < eventsPerDay; e++) {
         const startHour = 7 + ((i * 37 + e * 17) % 12); // between 7 and 18
         const startMin = [0, 15, 30, 45][(i * 11 + e * 7) % 4];
         const durationMin = 30 + 15 * ((i + e) % 6); // 30-105
         const title = eventTitles[(i * 5 + e * 3) % eventTitles.length];
-        const color = eventColors[(i + e) % eventColors.length];
         const location = randomChoice(roomNames);
         const attendeeCount = randomInt(1, 5);
         const attendees = Array.from({ length: attendeeCount }, () => randomPerson());
         const date = new Date(start);
         date.setDate(start.getDate() + i);
         date.setHours(startHour, startMin, 0, 0);
+        // Default color grey
+        const color = '#dcdcdc';
         calendarEvents.push({ dayIndex: i, start: date, durationMin, title, color, location, attendees, alive: true });
       }
+    }
+    // Randomly recolor ~60% to #b22222
+    for (const ev of calendarEvents) {
+      if (Math.random() < 0.6) ev.color = '#b22222';
     }
   }
 
