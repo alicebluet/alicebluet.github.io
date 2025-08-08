@@ -72,8 +72,8 @@
     const headerH = 56;
     const timeGutterW = 64;
     const days = 7; // Keep 7-day grid; we will not generate events on Sat/Sun
-    const startHour = 7;
-    const endHour = 19; // 7 PM
+    const startHour = 0; // 12 AM
+    const endHour = 12; // 12 PM
     const hours = endHour - startHour;
 
     const calX = marginX;
@@ -102,7 +102,7 @@
     for (let i = 1; i <= 5; i++) {
       const eventsPerDay = 7 + ((i * 3) % 4); // 7-10 events per day for "lots of meetings"
       for (let e = 0; e < eventsPerDay; e++) {
-        const startHour = 7 + ((i * 37 + e * 17) % 12); // between 7 and 18
+        const startHour = ((i * 37 + e * 17) % 12); // between 0 and 11 (12am–12pm)
         const startMin = [0, 15, 30, 45][(i * 11 + e * 7) % 4];
         const durationMin = 30 + 15 * ((i + e) % 6); // 30-105
         const title = eventTitles[(i * 5 + e * 3) % eventTitles.length];
